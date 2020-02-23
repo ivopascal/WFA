@@ -146,7 +146,7 @@ class ReportResult{
 	}
 }
 
-class WordScore{
+public class WordScore{
 	public static void main(String[] args){
 
 		ArrayList<Word> wordScores = new ArrayList<Word>();
