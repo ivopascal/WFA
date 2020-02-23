@@ -3,6 +3,9 @@ import java.io.IOException;
 import java.io.BufferedReader;
 import java.io.FileReader;
 
+import java.io.FileNotFoundException;
+import java.io.PrintWriter;
+
 import java.util.*; 
 import java.util.stream.IntStream;
 
@@ -19,8 +22,11 @@ class Word{
 	private float exploreScore;
 
 	public Word(String line){
+		// Because we expect CSV input, we seperate on commas
 		String[] components = line.split(",");
-		this.phrase = components[0].toLowerCase().replace("/^\\p{L}+$/u", "");
+		// Remove any punctuation in a phrase
+		this.phrase = components[0].toLowerCase().replace("[^a-zA-Z ]", "");
+		// Extract scores from CSV
 		this.exploreScore = Float.parseFloat(components[1]);
 		this.exploitScore = Float.parseFloat(components[2]);
 	}
@@ -60,10 +66,15 @@ class ReportResult{
 
 	public ReportResult(File f){
 		this.f = f;
-		this.path = f.getAbsolutePath();
+		this.path = f.getName();
 	}
 
 	public void determineScore(ArrayList<Word> wordlist){
+		// Initialize all values to 0
+		for(Word w : wordlist){
+			String phrase = w.getPhrase();
+			results.put(phrase, 0);
+		}
 		try(BufferedReader br = new BufferedReader(new FileReader(f))){
 			// Go over all the lines in the text file
 			String line;
@@ -71,14 +82,14 @@ class ReportResult{
 				StringTokenizer st = new StringTokenizer(line);
 				// Go over all the words in each line
 				while(st.hasMoreTokens()) {
-					String token = st.nextToken().toLowerCase().replace("/^\\p{L}+$/u", "");
+					String token = st.nextToken().toLowerCase().replaceAll("[^a-zA-Z ]", "");
 					this.number_words += 1;
 					//Go over all the words you want to scan for
 					IntStream.range(0, wordlist.size()).parallel().forEach(i -> {
 						Word word = wordlist.get(i);
 						String w = word.getPhrase();
 
-						// w may store multiple words, we want to check them starting at the first
+						// w may store multiple whords, we want to check them starting at the first
 						StringTokenizer wst = new StringTokenizer(w);
 						boolean match = true;
 						// Keep going until we run out of words, or we encounter a mismatch
@@ -91,15 +102,8 @@ class ReportResult{
 						if(match){
 							//Find the entry
 							Integer count = results.get(w);
-
-							//If it didn't exist create one at count 1
-							if(count == null){
-								count = 1;
-							}else{
-								// If it did exist we increase count by 1
-								count = count + 1;
-							}
-
+							// We increase count by 1
+							count = count + 1;
 							//Put the updated count back in the Results
 							results.put(w, count);
 							this.exploitScore += word.getExploitScore();
@@ -111,6 +115,7 @@ class ReportResult{
 		}catch (IOException e){
 			e.printStackTrace();
 		}
+		// Determines ratio
 		this.exploit_explore_ratio = this.exploitScore / exploreScore;
 	}
 
@@ -161,10 +166,7 @@ class WordScore{
 		File[] reports = reportFolder.listFiles();
 		ReportResult[] results = new ReportResult[reports.length];
 
-		// for(int i = 0; i< reports.length; i++){
-		// 	results[i] = new ReportResult(reports[i]);
-		// 	results[i].determineScore(wordScores);
-		// }
+
 		IntStream.range(0, reports.length).parallel().forEach(i -> {
 			// For each (annual)report create a ReportResult object
 			// Each such object will have a file(path), 
@@ -176,10 +178,13 @@ class WordScore{
 			// And compute the report's exploit and explore score
 			results[i].determineScore(wordScores);
 		});
-		printResults(results);
+
+		// Print the results to terminal and create CSV output
+		printResults(results, wordScores);
 	}
 
-	static void printResults(ReportResult[] results){
+	static void printResults(ReportResult[] results, ArrayList<Word> wordlist){
+		// Print a bunch of things to terminal
 		for(ReportResult result : results){
 			System.out.println(result.getPath());
 			System.out.println("ExploreScore: " + result.getExploreScore());
@@ -193,5 +198,40 @@ class WordScore{
 			} 
 			System.out.println("\n");
 		}
+
+		// Make a CSV file for output
+		try (PrintWriter writer = new PrintWriter(new File("result.csv"))) {
+			StringBuilder sb = new StringBuilder();
+			// Define labels for columns
+			sb.append("Name,Explore,Exploit,ratio,");
+			for(Word w : wordlist){
+				// A label will be made for each phrase we search for
+				sb.append(w.getPhrase() + ",");
+			}
+			sb.append("WordTotal");
+			// End the label row with \n
+			sb.append("\n");
+			for(ReportResult result : results){
+				// For each report we write the info into the respective columns defined above
+				sb.append(result.getPath() + ",");
+				sb.append(result.getExploreScore() + ",");
+				sb.append(result.getExploitScore() + ",");
+				// We leave 1 column empty which excel will use to determine a ratio
+				sb.append(",");
+				for(Word w : wordlist){
+					// For each word we check the score that the report found
+					sb.append(result.getDict().get(w.getPhrase()) + ",");
+				}
+				// At the end we log the number of words in each report
+				sb.append(result.getNumber_words());
+				// Move on to next line
+				sb.append("\n");
+			}
+			writer.write(sb.toString());
+		} catch (FileNotFoundException e) {
+      		System.out.println(e.getMessage());
+    	}
+
+
 	}
 }
