@@ -214,8 +214,17 @@ public class WordScore {
 			for(ReportResult result : results){
 				// For each report we write the info into the respective columns defined above
 				sb.append(result.getPath() + ",");
-				sb.append(result.getExploreScore() + ",");
-				sb.append(result.getExploitScore() + ",");
+				if(result.getExploreScore() == (long) result.getExploreScore()){
+					sb.append((long) result.getExploreScore() + ",");
+				}else{
+					sb.append(result.getExploreScore() + ",");
+				}
+
+				if(result.getExploitScore() == (long) result.getExploitScore()){
+					sb.append((long) result.getExploitScore() + ",");
+				}else{
+ 					sb.append(result.getExploitScore() + ",");
+ 				}
 				// We leave 1 column empty which excel will use to determine a ratio
 				sb.append(",");
 				for(Word w : wordlist){
